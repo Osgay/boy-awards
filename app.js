@@ -18,10 +18,72 @@ nominees:[
 winners:[],ballots:[],codes:['DEMO-2027-A','DEMO-2027-B','DEMO-2027-C'],adminEnabled:false});
 let data={categories:[],nominees:[],winners:[],ballots:[],codes:[],adminEnabled:false};
 let client=null,admin=false,session=null,activeVote=null,recentCodes=[];
+let eventDate=null;
 function saveDemo(){if(demo)localStorage.setItem('boy-awards-demo-v1',JSON.stringify(data));}
 function loadDemo(){try{const parsed=JSON.parse(localStorage.getItem('boy-awards-demo-v1'));data=parsed&&Array.isArray(parsed.categories)?parsed:seed();}catch{data=seed();}saveDemo();}
 const notify=(message)=>{const t=$('#toast');t.textContent=message;t.classList.add('shown');clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>t.classList.remove('shown'),3800);};
 const errText=(err)=>err?.message||String(err);
+function safeImage(value){
+ if(!value)return false;
+ try{const url=new URL(value);return url.protocol==='https:'&&url.href.length<=1000&&Boolean(url.hostname);}catch{return false;}
+}
+function formatLocalInput(date){
+ const pad=n=>String(n).padStart(2,'0');
+ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+function renderCountdown(){
+ const timer=$('#countdown-timer'),message=$('#countdown-message'),label=$('#event-date-label');
+ const parsed=eventDate?new Date(eventDate):null;
+ if(!parsed||Number.isNaN(parsed.getTime())){
+  timer.hidden=true;message.hidden=false;label.textContent='Data do evento ainda não definida';
+  message.textContent='O administrador ainda vai anunciar a data.';return;
+ }
+ label.textContent=new Intl.DateTimeFormat('pt-BR',{dateStyle:'full',timeStyle:'short'}).format(parsed);
+ const ms=parsed.getTime()-Date.now();
+ if(ms<=0){timer.hidden=true;message.hidden=false;message.textContent='CHEGOU O DIA! A resenha está oficialmente convocada.';return;}
+ timer.hidden=false;message.hidden=true;
+ const secs=Math.floor(ms/1000);
+ $('#cd-days').textContent=String(Math.floor(secs/86400)).padStart(2,'0');
+ $('#cd-hours').textContent=String(Math.floor((secs%86400)/3600)).padStart(2,'0');
+ $('#cd-minutes').textContent=String(Math.floor((secs%3600)/60)).padStart(2,'0');
+ $('#cd-seconds').textContent=String(secs%60).padStart(2,'0');
+}
+function syncEventEditor(){
+ const field=$('#event-start');if(!field)return;
+ const d=eventDate?new Date(eventDate):null;
+ field.value=d&&!Number.isNaN(d.getTime())?formatLocalInput(d):'';
+}
+async function fetchEvent(){
+ if(demo){eventDate=data.eventDate||null;renderCountdown();syncEventEditor();return;}
+ const {data:row,error}=await client.from('event_settings').select('event_at').eq('id',1).maybeSingle();
+ if(error){console.warn('Boy Awards: execute atualizacao-v1.4.sql para ativar o contador.',error);return;}
+ eventDate=row?.event_at||null;renderCountdown();syncEventEditor();
+}
+async function saveEvent(e){
+ e.preventDefault();if(!admin)return;
+ const value=$('#event-start').value;
+ const date=new Date(value);const feedback=$('#event-feedback');feedback.textContent='';
+ if(!value||Number.isNaN(date.getTime())){feedback.textContent='Escolha uma data e hora válidas.';return;}
+ try{
+  if(demo){data.eventDate=date.toISOString();saveDemo();}
+  else{const {error}=await client.from('event_settings').upsert({id:1,event_at:date.toISOString()},{onConflict:'id'});if(error)throw error;}
+  eventDate=date.toISOString();renderCountdown();notify('Data do evento salva!');
+ }catch(err){feedback.textContent=errText(err);}
+}
+async function clearEvent(){
+ if(!admin||!confirm('Remover a data do evento?'))return;
+ try{
+  if(demo){delete data.eventDate;saveDemo();}
+  else{const {error}=await client.from('event_settings').upsert({id:1,event_at:null},{onConflict:'id'});if(error)throw error;}
+  eventDate=null;renderCountdown();syncEventEditor();notify('Data removida.');
+ }catch(err){$('#event-feedback').textContent=errText(err);}
+}
+function previewCategoryImage(){
+ const value=$('#cat-image').value.trim(),wrap=$('#cat-image-preview');
+ wrap.hidden=!safeImage(value);
+ if(!wrap.hidden)$('#cat-image-preview-img').src=value;
+ else $('#cat-image-preview-img').removeAttribute('src');
+}
 function selectNominees(categoryId){return data.nominees.filter(n=>n.category_id===categoryId);}
 function showDemoBanner(){const b=$('#mode-banner');b.hidden=!demo;if(demo)b.innerHTML='<strong>MODO DE DEMONSTRAÇÃO</strong> — Dados e votos ficam apenas neste navegador; não são compartilhados entre seus amigos. Código de teste: <strong>DEMO-2027-A</strong>. Para ativar votação real, configure o Supabase.';}
 function renderPublic(){
@@ -29,7 +91,7 @@ function renderPublic(){
  $('#stats-categories').textContent=String(data.categories.filter(c=>c.edition===edition).length).padStart(2,'0');
  $('#stats-nominees').textContent=String(data.nominees.filter(n=>data.categories.some(c=>c.id===n.category_id&&c.edition===edition)).length).padStart(2,'0');
  const cats=data.categories.filter(c=>c.edition===edition).sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||'')));
- $('#category-grid').innerHTML=cats.length?cats.map(c=>{const ns=selectNominees(c.id);const open=c.voting_open&&ns.length>0;return `<article class="category-card"><div class="card-top"><span class="category-emoji">${esc(c.emoji||'🏆')}</span><span class="status ${c.voting_open?'':'closed'}">${c.voting_open?'● VOTAÇÃO ABERTA':'● ENCERRADA'}</span></div><h3>${esc(c.title)}</h3><p>${esc(c.description||'Quem merece levar esse prêmio?')}</p><div class="card-foot"><span class="nominee-count">✦ ${ns.length} INDICADO${ns.length!==1?'S':''}</span><button class="vote-open" data-vote-category="${esc(c.id)}" ${open?'':'disabled'}>${open?'VOTAR ↗':ns.length?'ENCERRADA':'SEM INDICADOS'}</button></div></article>`;}).join(''):'<div class="empty">Nenhuma categoria nesta edição ainda. Abra o painel para criar a primeira!</div>';
+ $('#category-grid').innerHTML=cats.length?cats.map(c=>{const ns=selectNominees(c.id);const open=c.voting_open&&ns.length>0;return `<article class="category-card">${safeImage(c.image_url)?`<div class="category-cover"><img src="${esc(c.image_url)}" alt="Capa da categoria ${esc(c.title)}" loading="lazy" referrerpolicy="no-referrer"></div>`:''}<div class="card-top"><span class="category-emoji">${esc(c.emoji||'🏆')}</span><span class="status ${c.voting_open?'':'closed'}">${c.voting_open?'● VOTAÇÃO ABERTA':'● ENCERRADA'}</span></div><h3>${esc(c.title)}</h3><p>${esc(c.description||'Quem merece levar esse prêmio?')}</p><div class="card-foot"><span class="nominee-count">✦ ${ns.length} INDICADO${ns.length!==1?'S':''}</span><button class="vote-open" data-vote-category="${esc(c.id)}" ${open?'':'disabled'}>${open?'VOTAR ↗':ns.length?'ENCERRADA':'SEM INDICADOS'}</button></div></article>`;}).join(''):'<div class="empty">Nenhuma categoria nesta edição ainda. Abra o painel para criar a primeira!</div>';
  const winners=data.winners.map(w=>({...w,category:data.categories.find(c=>c.id===w.category_id),nominee:data.nominees.find(n=>n.id===w.nominee_id)})).filter(w=>w.category&&w.nominee).sort((a,b)=>String(b.category.edition).localeCompare(String(a.category.edition)));
  $('#winner-grid').innerHTML=winners.length?winners.map(w=>`<article class="winner-card"><span>🏆 EDIÇÃO ${esc(w.category.edition)} — VENCEDOR</span><h3>${esc(w.category.title)}</h3><p>★ ${esc(w.nominee.name)}</p></article>`).join(''):'<div class="empty">Os vencedores ainda são um segredo. Depois da revelação, o Hall da Fama aparece aqui.</div>';
 }
@@ -50,9 +112,9 @@ async function refreshData(){if(demo){renderPublic();return;}
 async function refreshAdmin(){if(!admin)return;renderCategoryAdmin();await renderResults();}
 function renderCategoryAdmin(){const cats=[...data.categories].sort((a,b)=>String(b.edition).localeCompare(String(a.edition)));$('#admin-category-list').innerHTML=cats.length?cats.map(c=>`<div class="admin-list-item"><strong>${esc(c.emoji||'🏆')} ${esc(c.title)} <small>(${esc(c.edition)})</small></strong><small>${selectNominees(c.id).length} indicado(s) · ${c.voting_open?'Aberta':'Fechada'}</small><div class="admin-item-actions"><button data-edit-cat="${esc(c.id)}">Editar</button><button data-list-nominees="${esc(c.id)}">Gerenciar indicados</button><button data-delete-cat="${esc(c.id)}">Excluir</button></div></div>`).join(''):'<p class="dimmed">Nenhuma categoria.</p>';
 }
-function editCategory(id){const c=data.categories.find(c=>c.id===id);if(!c)return;$('#edit-category-id').value=c.id;$('#cat-title').value=c.title;$('#cat-description').value=c.description||'';$('#cat-edition').value=c.edition;$('#cat-emoji').value=c.emoji||'';$('#cat-open').checked=c.voting_open;$('#save-category-btn').textContent='ATUALIZAR CATEGORIA';$('#cancel-edit').hidden=false;$('#admin-categories').scrollTop=0;}
-function resetCategory(){ $('#category-form').reset();$('#edit-category-id').value='';$('#cat-edition').value=edition;$('#cat-open').checked=true;$('#save-category-btn').textContent='SALVAR CATEGORIA';$('#cancel-edit').hidden=true;}
-async function saveCategory(event){event.preventDefault();const id=$('#edit-category-id').value;const payload={title:$('#cat-title').value.trim(),description:$('#cat-description').value.trim(),edition:$('#cat-edition').value.trim(),emoji:$('#cat-emoji').value.trim()||'🏆',voting_open:$('#cat-open').checked};if(!payload.title||!payload.edition)return;try{if(demo){if(id)Object.assign(data.categories.find(c=>c.id===id),payload);else data.categories.push({id:uid(),created_at:new Date().toISOString(),...payload});saveDemo();}else{const op=id?client.from('categories').update(payload).eq('id',id):client.from('categories').insert(payload);const{error}=await op;if(error)throw error;}resetCategory();await refreshData();await refreshAdmin();notify('Categoria salva!');}catch(e){$('#admin-feedback').textContent=errText(e);}}
+function editCategory(id){const c=data.categories.find(c=>c.id===id);if(!c)return;$('#edit-category-id').value=c.id;$('#cat-title').value=c.title;$('#cat-description').value=c.description||'';$('#cat-edition').value=c.edition;$('#cat-emoji').value=c.emoji||'';$('#cat-image').value=c.image_url||'';previewCategoryImage();$('#cat-open').checked=c.voting_open;$('#save-category-btn').textContent='ATUALIZAR CATEGORIA';$('#cancel-edit').hidden=false;$('#admin-categories').scrollTop=0;}
+function resetCategory(){ $('#category-form').reset();$('#edit-category-id').value='';$('#cat-edition').value=edition;$('#cat-open').checked=true;$('#cat-image').value='';previewCategoryImage();$('#save-category-btn').textContent='SALVAR CATEGORIA';$('#cancel-edit').hidden=true;}
+async function saveCategory(event){event.preventDefault();const id=$('#edit-category-id').value;const payload={title:$('#cat-title').value.trim(),description:$('#cat-description').value.trim(),edition:$('#cat-edition').value.trim(),emoji:$('#cat-emoji').value.trim()||'🏆',image_url:$('#cat-image').value.trim()||null,voting_open:$('#cat-open').checked};if(!payload.title||!payload.edition)return;if(payload.image_url&&!safeImage(payload.image_url)){$('#admin-feedback').textContent='Use uma URL HTTPS válida para a imagem.';return;}try{if(demo){if(id)Object.assign(data.categories.find(c=>c.id===id),payload);else data.categories.push({id:uid(),created_at:new Date().toISOString(),...payload});saveDemo();}else{const op=id?client.from('categories').update(payload).eq('id',id):client.from('categories').insert(payload);const{error}=await op;if(error)throw error;}resetCategory();await refreshData();await refreshAdmin();notify('Categoria salva!');}catch(e){$('#admin-feedback').textContent=errText(e);}}
 let activeNomineesCategoryId=null;
 function openNomineesManager(categoryId){
  const cat=data.categories.find(c=>c.id===categoryId);
@@ -108,7 +170,7 @@ async function unreveal(categoryId){if(!confirm('Ocultar este vencedor do Hall d
 function bindEvents(){document.addEventListener('click',async event=>{const t=event.target.closest('button');if(!t)return;
  if(t.dataset.close){hideDialog(t.dataset.close);return;}
  if(t.dataset.voteCategory){openVote(t.dataset.voteCategory);return;}
- if(t.dataset.adminTab){document.querySelectorAll('[data-admin-tab]').forEach(b=>b.classList.toggle('active',b===t));document.querySelectorAll('.admin-section').forEach(s=>s.hidden=s.id!==`admin-${t.dataset.adminTab}`);if(t.dataset.adminTab==='reveal')await renderResults();return;}
+ if(t.dataset.adminTab){document.querySelectorAll('[data-admin-tab]').forEach(b=>b.classList.toggle('active',b===t));document.querySelectorAll('.admin-section').forEach(s=>s.hidden=s.id!==`admin-${t.dataset.adminTab}`);if(t.dataset.adminTab==='reveal')await renderResults();if(t.dataset.adminTab==='event')syncEventEditor();return;}
  if(!admin)return;
  if(t.dataset.editCat){editCategory(t.dataset.editCat);return;}
  if(t.dataset.addNominee){openNomineesManager(t.dataset.addNominee);return;}
@@ -121,6 +183,9 @@ function bindEvents(){document.addEventListener('click',async event=>{const t=ev
  $('#admin-link').addEventListener('click',async()=>{$('#admin-feedback').textContent='';await checkAdmin();if(admin)await refreshAdmin();showDialog('admin-dialog');});
  $('#vote-form').addEventListener('submit',submitVote);
  $('#category-form').addEventListener('submit',saveCategory);
+ $('#cat-image').addEventListener('input',previewCategoryImage);
+ $('#event-form').addEventListener('submit',saveEvent);
+ $('#event-clear').addEventListener('click',clearEvent);
  $('#nominee-form').addEventListener('submit',saveNominee);
  $('#cancel-edit').addEventListener('click',resetCategory);
  $('#codes-form').addEventListener('submit',generateCodes);
@@ -130,5 +195,6 @@ function bindEvents(){document.addEventListener('click',async event=>{const t=ev
  $('#logout-btn').addEventListener('click',async()=>{if(demo){data.adminEnabled=false;saveDemo();}else await client.auth.signOut();admin=false;adminVisibility();notify('Sessão encerrada.');});
  ['vote-dialog','admin-dialog','nominees-dialog'].forEach(id=>{const d=document.getElementById(id);d.addEventListener('click',e=>{if(e.target===d)d.close();});});
 }
-async function start(){bindEvents();showDemoBanner();resetCategory();if(demo){loadDemo();await checkAdmin();renderPublic();}else{try{const{createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');client=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);await checkAdmin();await refreshData();}catch(e){console.error(e);$('#category-grid').innerHTML=`<div class="empty">Não foi possível conectar ao Supabase. Confira config.js e sua conexão. ${esc(errText(e))}</div>`;notify('Erro de conexão com o banco de dados.');}}}
+async function start(){bindEvents();showDemoBanner();resetCategory();if(demo){loadDemo();await checkAdmin();renderPublic();await fetchEvent();}else{try{const{createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');client=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);await checkAdmin();await refreshData();await fetchEvent();}catch(e){console.error(e);$('#category-grid').innerHTML=`<div class="empty">Não foi possível conectar ao Supabase. Confira config.js e sua conexão. ${esc(errText(e))}</div>`;notify('Erro de conexão com o banco de dados.');}}}
 start();
+setInterval(renderCountdown,1000);
