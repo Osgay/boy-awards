@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#100b25">
+  <meta name="description" content="Boy Awards — a premiação mais duvidosa do ano.">
+  <title>Boy Awards | A premiação mais duvidosa do ano</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="config.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div><div class="ambient ambient-b" aria-hidden="true"></div>
+  <header class="header wrap">
+    <a class="brand" href="#inicio" aria-label="Boy Awards, início"><span class="brand-icon">★</span><span>BOY<span class="gradient-text">AWARDS</span><small>O prêmio da resenha</small></span></a>
+    <nav class="nav" aria-label="Navegação principal">
+      <a href="#categorias">Categorias</a><a href="#hall">Hall da fama</a><button id="admin-link" class="nav-admin" type="button">Painel <span aria-hidden="true">↗</span></button>
+    </nav>
+  </header>
+  <main id="inicio">
+    <section class="hero wrap">
+      <div class="hero-content">
+        <div class="edition-pill"><span class="live-dot"></span><span id="edition-label">EDIÇÃO 2027</span><span class="pill-divider">/</span><span>VOTAÇÃO ABERTA</span></div>
+        <p class="eyebrow">O EVENTO QUE NINGUÉM PEDIU</p>
+        <h1>OS MELHORES.<br>OS PIORES.<br><span class="gradient-text">OS BOYS.</span></h1>
+        <p class="hero-sub">Uma noite de glória, vergonha e decisões questionáveis. Escolha seus favoritos e ajude a escrever a história da resenha.</p>
+        <div class="hero-actions"><a class="btn btn-primary" href="#categorias">VOTAR AGORA <span>↗</span></a><a class="btn btn-quiet" href="#hall">VER VENCEDORES <span>↗</span></a></div>
+        <div class="mini-stats"><span><strong id="stats-categories">00</strong> CATEGORIAS</span><i></i><span><strong id="stats-nominees">00</strong> INDICADOS</span><i></i><span><strong>100%</strong> RESENHA</span></div>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="art-orbit orbit-1"></div><div class="art-orbit orbit-2"></div><div class="art-glow"></div><div class="trophy">🏆</div><div class="art-star star-1">✦</div><div class="art-star star-2">✧</div><span class="art-tag">#1 NO GRUPO</span><span class="art-bottom">MAIS UMA EDIÇÃO HISTÓRICA*</span><span class="art-footnote">*provavelmente</span></div>
+    </section>
+    <section class="marquee" aria-hidden="true"><div class="marquee-inner">★ ÍCONES DA RESENHA ★ LENDAS DO GRUPO ★ ZERO CREDIBILIDADE ★ 100% GLÓRIA ★ ÍCONES DA RESENHA ★ LENDAS DO GRUPO ★ ZERO CREDIBILIDADE ★ 100% GLÓRIA ★</div></section>
+    <section id="categorias" class="section wrap">
+      <div class="section-head"><div><p class="eyebrow">SEU VOTO, SEU BOY</p><h2>As <span class="gradient-text">categorias.</span></h2><p>Escolha um indicado em cada categoria. Um voto por código, por categoria.</p></div><span class="corner-symbol">✳</span></div>
+      <div id="mode-banner" class="mode-banner" hidden></div>
+      <div id="category-grid" class="category-grid" aria-live="polite"></div>
+    </section>
+    <section id="hall" class="section wrap hall-section"><div class="section-head"><div><p class="eyebrow">IMORTALIZADOS NA ZOEIRA</p><h2>Hall da <span class="gradient-text">fama.</span></h2><p>Os ganhadores oficialmente consagrados (ou expostos) em cada edição.</p></div><span class="corner-symbol">✦</span></div><div id="winner-grid" class="winner-grid"></div></section>
+    <section class="outro wrap"><div class="outro-card"><span>★ THE BOYS HAVE SPOKEN ★</span><h2>Sem panelinha.<br><em>Ou quase.</em></h2><p>A votação é secreta até a revelação dos vencedores. As decisões do grupo são definitivas. Reclamações só no grupo.</p></div></section>
+  </main>
+  <footer class="footer wrap"><span>★ BOY AWARDS <small>© <span id="year"></span> — Todos os direitos duvidosos.</small></span><span>FEITO PELA RESENHA, PARA A RESENHA.</span></footer>
+
+  <dialog id="vote-dialog" class="dialog"><form id="vote-form" class="dialog-content"><button type="button" class="close-dialog" data-close="vote-dialog" aria-label="Fechar">×</button><p class="eyebrow">VOTO ULTRASSECRETO</p><h2>Confirma esse <span class="gradient-text">voto?</span></h2><p id="vote-target" class="dialog-target"></p><label class="field-label" for="voter-code">Seu código individual</label><input id="voter-code" name="code" placeholder="EX.: ABCD-1234-EFGH-5678" autocomplete="off" required maxlength="40"><p class="field-help">O mesmo código pode votar uma vez em cada categoria.</p><p id="vote-error" class="form-error" role="alert"></p><button class="btn btn-primary btn-wide" id="vote-submit" type="submit">CONFIRMAR MEU VOTO ↗</button></form></dialog>
+  <dialog id="admin-dialog" class="dialog dialog-large"><div class="dialog-content"><button type="button" class="close-dialog" data-close="admin-dialog" aria-label="Fechar">×</button><div class="admin-top"><div><p class="eyebrow">SÓ PARA A DIRETORIA DA RESENHA</p><h2>Painel <span class="gradient-text">admin.</span></h2></div><button class="btn btn-small btn-quiet" id="logout-btn" hidden>Sair</button></div>
+      <div id="admin-login"><p class="dimmed">Faça login com a conta administradora para gerenciar o evento.</p><form id="login-form" class="stack"><label class="field-label" for="admin-email">E-mail</label><input type="email" id="admin-email" required placeholder="admin@exemplo.com"><label class="field-label" for="admin-password">Senha</label><input type="password" id="admin-password" required minlength="6" placeholder="Sua senha"><button class="btn btn-primary btn-wide" type="submit">ENTRAR NO PAINEL ↗</button></form><button id="demo-admin-btn" class="demo-link" type="button" hidden>Entrar como administrador de demonstração</button></div>
+      <div id="admin-content" hidden><div class="admin-tabs"><button type="button" data-admin-tab="categories" class="active">Categorias</button><button type="button" data-admin-tab="codes">Códigos</button><button type="button" data-admin-tab="reveal">Apuração</button></div>
+        <section id="admin-categories" class="admin-section"><form id="category-form" class="stack"><input type="hidden" id="edit-category-id"><label class="field-label" for="cat-title">Nome da categoria</label><input id="cat-title" required maxlength="90" placeholder="Ex.: Maior sumido do grupo"><label class="field-label" for="cat-description">Descrição</label><input id="cat-description" maxlength="220" placeholder="Quem nunca aparece, mas sempre promete?"><div class="admin-inline"><div><label class="field-label" for="cat-edition">Edição</label><input id="cat-edition" required maxlength="12" placeholder="2027"></div><div><label class="field-label" for="cat-emoji">Emoji</label><input id="cat-emoji" maxlength="8" placeholder="👻"></div></div><label class="check-line"><input type="checkbox" id="cat-open" checked> Votação aberta</label><button class="btn btn-primary btn-wide" type="submit" id="save-category-btn">SALVAR CATEGORIA</button><button type="button" class="demo-link" id="cancel-edit" hidden>Cancelar edição</button></form><div class="divider"></div><h3>Categorias cadastradas</h3><div id="admin-category-list" class="admin-list"></div></section>
+        <section id="admin-codes" class="admin-section" hidden><p class="dimmed">Gere um código por amigo. Salve e distribua os códigos: por segurança, eles são exibidos apenas uma vez na versão conectada.</p><form id="codes-form" class="code-maker"><label class="field-label" for="code-count">Quantos códigos?</label><input id="code-count" type="number" min="1" max="100" value="10" required><button class="btn btn-primary" type="submit">GERAR CÓDIGOS</button></form><div id="generated-codes" class="generated-codes"></div><button id="copy-codes" class="btn btn-quiet btn-small" type="button" hidden>Copiar códigos</button></section>
+        <section id="admin-reveal" class="admin-section" hidden><p class="dimmed">Acompanhe a apuração. Só os vencedores revelados aparecem publicamente no Hall da Fama.</p><div id="admin-results" class="admin-list"></div></section>
+      </div><p id="admin-feedback" class="form-error" role="status"></p></div></dialog>
+  <dialog id="nominees-dialog" class="dialog dialog-large">
+    <div class="dialog-content">
+      <button type="button" class="close-dialog" data-close="nominees-dialog" aria-label="Fechar">×</button>
+      <p class="eyebrow">GERENCIAR PARTICIPANTES</p>
+      <h2>Indicados <span class="gradient-text">da categoria.</span></h2>
+      <p id="nominees-category-name" class="dimmed"></p>
+      <form id="nominee-form" class="nominee-form">
+        <div class="nominee-field"><label class="field-label" for="nominee-name">Nome do indicado</label><input id="nominee-name" maxlength="90" autocomplete="off" required placeholder="Ex.: João, o desaparecido"></div>
+        <button class="btn btn-primary" type="submit">+ ADICIONAR</button>
+      </form>
+      <p id="nominee-feedback" class="form-error" role="alert"></p>
+      <div id="nominees-list" class="nominees-list" aria-live="polite"></div>
+      <button type="button" class="btn btn-quiet btn-wide" data-close="nominees-dialog">CONCLUIR</button>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
